@@ -1,0 +1,74 @@
+/* src/dba_tools/tui/styles.tcss */
+
+/* --- PALETTE --- */
+/* BG: #000957 | Highlight: #FFEB00 | Text: #577BC1 | Accent: #344CB7 */
+
+Screen {
+    background: #00224D;
+    color: #577BC1;
+    align: center middle;
+}
+
+#main-container {
+    width: 60;
+    height: auto;
+    border: none;
+    padding: 1 2;
+}
+
+/* Header Area */
+#header-area {
+    margin-bottom: 2;
+    border-bottom: solid #344CB7; /* Garis bawah header */
+    padding-bottom: 1;
+    text-align: center;
+}
+
+.ascii-title {
+    color: #FFEB00;
+    text-align: center;
+}
+
+.login-info {
+    color: #344CB7;
+    text-align: center;
+    margin-top: 1;
+}
+
+/* Menu Area */
+.menu-label {
+    color: #FFEB00;
+    text-style: bold;
+    margin-bottom: 1;
+    text-align: left;
+    padding-left: 1;
+}
+
+ListView {
+    background: #00224D;
+    border: none;
+    margin-bottom: 2;
+}
+
+ListItem {
+    padding: 1 2;
+    margin-bottom: 1;
+    color: #577BC1;
+}
+
+ListItem:hover, ListItem.-highlight {
+    background: #FFEB00;
+    color: #000957; 
+    text-style: bold;
+}
+
+/* Footer (Updated) */
+.footer-text {
+    text-align: center;
+    color: #344CB7;      /* Warna biru medium */
+    margin-top: 1;
+    border-top: solid #344CB7; /* Garis pemisah footer */
+    padding-top: 1;      /* Jarak teks dari garis */
+    width: 100%;         /* Memenuhi lebar container */
+    text-style: bold;
+}

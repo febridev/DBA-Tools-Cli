@@ -1,24 +1,10 @@
 [project]
-name = "cli_python"
+name = "dba-tools-cli"
 version = "0.1.0"
-description = "Default template for PDM package"
-authors = [
-    {name = "Febriyant", email = "febriyantabidin@gmail.com"},
-]
-dependencies = [
-    "click>=8.1.7",
-    "prompt-toolkit>=3.0.43",
-    "pyfiglet>=1.0.2",
-    "load-dotenv>=0.1.0",
-]
-requires-python = ">=3.12"
+description = "Add your description here"
 readme = "README.md"
-license = {text = "None"}
-
-[build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
-
-
-[tool.pdm]
-distribution = true
+requires-python = ">=3.9"
+dependencies = [
+    "python-dotenv>=1.2.1",
+    "textual>=7.3.0",
+]
