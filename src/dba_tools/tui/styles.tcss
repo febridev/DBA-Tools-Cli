@@ -1,11 +1,19 @@
 /* src/dba_tools/tui/styles.tcss */
 
-/* --- PALETTE --- */
-/* BG: #000957 | Highlight: #FFEB00 | Text: #577BC1 | Accent: #344CB7 */
+/* --- TOKYO NIGHT PALETTE --- */
+/* BG (Night): #1a1b26 
+   BG (Storm): #24283b (untuk input/container)
+   FG (Text):  #c0caf5 
+   Blue:       #7aa2f7 
+   Cyan:       #7dcfff
+   Magenta:    #bb9af7
+   Yellow:     #e0af68
+   Green:      #9ece6a
+*/
 
 Screen {
-    background: #00224D;
-    color: #577BC1;
+    background: #1a1b26; /* Tokyo Night Background */
+    color: #c0caf5;      /* Moonlight Text */
     align: center middle;
 }
 
@@ -19,25 +27,25 @@ Screen {
 /* Header Area */
 #header-area {
     margin-bottom: 2;
-    border-bottom: solid #344CB7; /* Garis bawah header */
+    border-bottom: solid #7aa2f7; /* Tokyo Blue Border */
     padding-bottom: 1;
     text-align: center;
 }
 
 .ascii-title {
-    color: #FFEB00;
+    color: #bb9af7; /* Tokyo Magenta untuk Judul agar pop-up */
     text-align: center;
 }
 
 .login-info {
-    color: #344CB7;
+    color: #7dcfff; /* Tokyo Cyan */
     text-align: center;
     margin-top: 1;
 }
 
 /* Menu Area */
 .menu-label {
-    color: #FFEB00;
+    color: #e0af68; /* Tokyo Yellow */
     text-style: bold;
     margin-bottom: 1;
     text-align: left;
@@ -45,7 +53,7 @@ Screen {
 }
 
 ListView {
-    background: #00224D;
+    background: #1a1b26;
     border: none;
     margin-bottom: 2;
 }
@@ -53,22 +61,61 @@ ListView {
 ListItem {
     padding: 1 2;
     margin-bottom: 1;
-    color: #577BC1;
+    color: #c0caf5; /* Default Text */
 }
 
+/* --- TOKYO HIGHLIGHT STYLE --- */
+/* Saat disorot: Gunakan Background Biru Terang dengan Teks Gelap */
 ListItem:hover, ListItem.-highlight {
-    background: #FFEB00;
-    color: #000957; 
+    background: #7aa2f7; /* Tokyo Blue Background */
+    color: #1a1b26;      /* Dark BG Text (Contrast) */
     text-style: bold;
 }
 
-/* Footer (Updated) */
+/* Footer */
 .footer-text {
     text-align: center;
-    color: #344CB7;      /* Warna biru medium */
+    color: #565f89;      /* Muted Blue/Grey untuk footer (tidak terlalu mencolok) */
     margin-top: 1;
-    border-top: solid #344CB7; /* Garis pemisah footer */
-    padding-top: 1;      /* Jarak teks dari garis */
-    width: 100%;         /* Memenuhi lebar container */
+    border-top: solid #565f89;
+    padding-top: 1;
+    width: 100%;
     text-style: bold;
+}
+
+/* --- TO DO LIST MODULE STYLES --- */
+
+Input {
+    background: #24283b; /* Tokyo Storm (Sedikit lebih terang dari BG utama) */
+    border: solid #7aa2f7;
+    color: #c0caf5;
+    margin-bottom: 2;
+    height: auto;
+}
+
+Input:focus {
+    border: solid #bb9af7; /* Border Magenta saat fokus */
+}
+
+#list-label {
+    margin-top: 1;
+}
+
+/* Normal Task Done */
+.task-done {
+    color: #9ece6a; /* Tokyo Green */
+    text-style: strike;
+}
+
+/* Fix: Task Done saat Disorot */
+/* Tetap hijau tapi lebih gelap atau menyesuaikan background highlight */
+ListItem.task-done:hover, ListItem.task-done.-highlight {
+    background: #9ece6a; /* Background Hijau saat highlight item selesai */
+    color: #1a1b26;      /* Teks Gelap */
+    text-style: bold strike;
+}
+
+ListItem.task-done:hover Label, ListItem.task-done.-highlight Label {
+    text-style: bold strike;
+    color: #1a1b26;
 }
