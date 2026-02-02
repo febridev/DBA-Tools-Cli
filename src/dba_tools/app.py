@@ -7,6 +7,7 @@ from textual.binding import Binding
 
 # -- IMPORT NEW SCREEN -- 
 from src.dba_tools.tui.screens.todo_list import ToDoListScreen 
+from src.dba_tools.tui.screens.ssh_manager import SSHManagerScreen
 
 # Konstanta Versi
 APP_VERSION = "0.2.0"
@@ -58,7 +59,8 @@ class DBAToolsApp(App):
             # self.notify("ACCESSING To-Do List...", severity="information")
             self.push_screen(ToDoListScreen())
         elif selected_id == "opt-ssh":
-            self.notify("ACCESSING SSH...", severity="information")
+            # self.notify("ACCESSING SSH...", severity="information")
+            self.push_screen(SSHManagerScreen())
         elif selected_id == "opt-dbide":
             self.notify("ACCESSING Database IDE...", severity="information")
         elif selected_id == "opt-exit":

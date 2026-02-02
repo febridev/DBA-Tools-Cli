@@ -119,3 +119,48 @@ ListItem.task-done:hover Label, ListItem.task-done.-highlight Label {
     text-style: bold strike;
     color: #1a1b26;
 }
+
+/* --- SSH Manager Style --- */
+.hidden {
+    display: none;
+}
+
+#ssh-form-area {
+    margin-top: 1;
+    border: tall #7aa2f7;
+    padding: 1;
+}
+
+#ssh-form-area Button {
+    margin: 1 1 0 1;
+    width: 1fr;
+}
+
+
+/* Tombol Save (Tokyo Green) */
+#btn-save-ssh {
+    background: #9ece6a; /* Tokyo Green */
+    color: #1a1b26;      /* Dark Background Text */
+    border: none;        /* Hilangkan border default agar warna solid */
+    text-style: bold;
+}
+
+/* Efek saat Save disorot/hover */
+#btn-save-ssh:hover, #btn-save-ssh:focus {
+    background: #73daca; /* Tokyo Teal (Variasi hijau terang) */
+    color: #1a1b26;
+}
+
+/* Tombol Cancel (Tokyo Red) */
+#btn-cancel-ssh {
+    background: #f7768e; /* Tokyo Red */
+    color: #1a1b26;      /* Dark Background Text */
+    border: none;
+    text-style: bold;
+}
+
+/* Efek saat Cancel disorot/hover */
+#btn-cancel-ssh:hover, #btn-cancel-ssh:focus {
+    background: #db4b4b; /* Merah sedikit lebih gelap/beda tone */
+    color: #1a1b26;
+}
