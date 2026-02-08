@@ -1,5 +1,7 @@
 import os
-import re
+import subprocess
+import shlex
+import platform
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -11,9 +13,6 @@ from textual.binding import Binding
 
 # --- CUSTOM WIDGET FOR HOST ITEM ---
 class SSHHostItem(ListItem):
-    """
-    Custom ListItem that stores the host name internally.
-    """
     def __init__(self, host_name: str) -> None:
         self.host_name = host_name
         super().__init__(Label(host_name))
@@ -21,20 +20,16 @@ class SSHHostItem(ListItem):
 
 # --- HELPER CLASS FOR SSH CONFIG IO ---
 class SSHConfigHelper:
-    """Helper class to parse and manipulate ~/.ssh/config file."""
-    
     def __init__(self):
         self.config_path = Path.home() / ".ssh" / "config"
         self._ensure_config_exists()
 
     def _ensure_config_exists(self):
-        """Ensures the .ssh directory and config file exist."""
         if not self.config_path.exists():
             self.config_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
             self.config_path.touch(mode=0o600)
 
     def get_all_hosts(self) -> List[str]:
-        """Retrieves a list of all defined 'Host' aliases."""
         hosts = []
         if not self.config_path.exists():
             return hosts
@@ -49,7 +44,6 @@ class SSHConfigHelper:
         return hosts
 
     def get_host_details(self, host_name: str) -> Dict[str, str]:
-        """Retrieves details for a specific Host alias."""
         details = {"Host": host_name, "HostName": "", "User": "", "Port": "22"}
         in_target_host = False
         
@@ -70,14 +64,12 @@ class SSHConfigHelper:
         return details
 
     def save_host_config(self, original_host: Optional[str], new_data: Dict[str, str]) -> bool:
-        """Saves configuration (Append for new, Replace for edit)."""
         new_block = (
             f"Host {new_data['Host']}\n"
             f"    HostName {new_data['HostName']}\n"
             f"    User {new_data['User']}\n"
             f"    Port {new_data['Port']}\n"
         )
-
         try:
             if not original_host:
                 with open(self.config_path, "a") as f:
@@ -89,7 +81,6 @@ class SSHConfigHelper:
 
             new_lines = []
             skipping = False
-            
             for line in lines:
                 stripped = line.strip()
                 if stripped.startswith("Host "):
@@ -107,18 +98,13 @@ class SSHConfigHelper:
             with open(self.config_path, "w") as f:
                 f.writelines(new_lines)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
 
 # --- UI SCREEN ---
 
 class SSHManagerScreen(Screen):
-    """
-    Screen for SSH Management: Add, Edit (Update), and Connect.
-    Includes Search/Filter functionality.
-    """
-
     CSS_PATH = "../styles.tcss"
     BINDINGS = [
         Binding("escape", "handle_back", "Back"),
@@ -129,7 +115,8 @@ class SSHManagerScreen(Screen):
         super().__init__(**kwargs)
         self.ssh_helper = SSHConfigHelper()
         self.editing_host: Optional[str] = None 
-        self.all_hosts_cache: List[str] = [] # Cache to store all hosts for filtering
+        self.connect_mode: bool = False
+        self.all_hosts_cache: List[str] = []
 
     def compose(self) -> ComposeResult:
         with Container(id="main-container"):
@@ -141,17 +128,14 @@ class SSHManagerScreen(Screen):
                 yield ListView(
                     ListItem(Label("1. \uf0fe ADD_NEW_CONFIG"), id="opt-add"),
                     ListItem(Label("2. \uf044 EDIT_CONFIG"), id="opt-edit"),
-                    ListItem(Label("3. \uf0c1 CONNECT_SSH (WIP)"), id="opt-connect"),
+                    ListItem(Label("3. \uf0c1 CONNECT_SSH (NEW TAB)"), id="opt-connect"),
                     id="ssh-main-list"
                 )
 
-            # --- 2. HOST SELECTION LIST (With Search) ---
+            # --- 2. HOST SELECTION LIST ---
             with Vertical(id="ssh-host-list-area", classes="hidden"):
-                yield Label("SEARCH_HOST:", classes="menu-label")
-                
-                # Search Input Box
-                yield Input(placeholder="Type to filter...", id="search-box")
-                
+                yield Label(id="host-list-title", classes="menu-label")
+                yield Input(placeholder="Type to search host...", id="search-box")
                 yield Label("AVAILABLE_HOSTS:", classes="menu-label")
                 yield ListView(id="host-list-view")
                 yield Button("BACK", id="btn-back-to-menu")
@@ -177,65 +161,44 @@ class SSHManagerScreen(Screen):
     # --- ACTION HANDLERS ---
 
     def action_handle_back(self) -> None:
-        """Smart Handler for ESC key."""
-        # 1. Back from Form
         if not self.query_one("#ssh-form-area").has_class("hidden"):
             if self.editing_host:
-                # Go back to list without resetting the search state
                 self.query_one("#ssh-form-area").add_class("hidden")
                 self.query_one("#ssh-host-list-area").remove_class("hidden")
-                self.query_one("#search-box").focus() # Focus back to search
+                self.query_one("#search-box").focus()
             else:
                 self._reset_to_main_menu()
             return
-
-        # 2. Back from Host List
         if not self.query_one("#ssh-host-list-area").has_class("hidden"):
             self._reset_to_main_menu()
             return
-
-        # 3. Back from Main Menu
         self.app.pop_screen()
 
     def action_focus_list(self):
-        """Shortcut: Press Down in search box to jump to list."""
         if not self.query_one("#ssh-host-list-area").has_class("hidden"):
             self.query_one("#host-list-view").focus()
 
     def _reset_to_main_menu(self):
-        """Reset UI to main menu."""
         self.query_one("#ssh-menu-area").remove_class("hidden")
         self.query_one("#ssh-host-list-area").add_class("hidden")
         self.query_one("#ssh-form-area").add_class("hidden")
-        
         self.editing_host = None
-        for inp in self.query(Input):
-            if inp.id == "search-box":
-                inp.value = "" # Clear search
-            elif inp.id == "input-port":
-                inp.value = "22"
-            else:
-                inp.value = ""
-            
+        self.connect_mode = False
         self.query_one("#ssh-main-list").focus()
 
     # --- EVENT HANDLERS ---
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        """Real-time search filtering."""
         if event.input.id == "search-box":
-            search_query = event.value.lower()
-            self.update_host_list(search_query)
+            self.update_host_list(event.value.lower())
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        """When Enter is pressed in search box."""
         if event.input.id == "search-box":
-            # If search box submitted, move focus to the first item in list (if any)
             list_view = self.query_one("#host-list-view", ListView)
             if list_view.children:
                 list_view.focus()
 
-    def on_list_view_selected(self, event: ListView.Selected) -> None:
+    async def on_list_view_selected(self, event: ListView.Selected) -> None:
         list_id = event.list_view.id
         selected_id = event.item.id
 
@@ -243,13 +206,18 @@ class SSHManagerScreen(Screen):
             if selected_id == "opt-add":
                 self.mode_add_new()
             elif selected_id == "opt-edit":
-                self.mode_select_host_to_edit()
+                self.connect_mode = False
+                self.mode_select_host_list("SELECT HOST TO EDIT")
             elif selected_id == "opt-connect":
-                self.notify("Connect feature coming soon!", severity="warning")
+                self.connect_mode = True
+                self.mode_select_host_list("SELECT HOST TO CONNECT")
 
         elif list_id == "host-list-view":
             if isinstance(event.item, SSHHostItem):
-                self.mode_edit_form(event.item.host_name)
+                if self.connect_mode:
+                    self.launch_ssh_in_new_tab(event.item.host_name)
+                else:
+                    self.mode_edit_form(event.item.host_name)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         btn_id = event.button.id
@@ -260,20 +228,103 @@ class SSHManagerScreen(Screen):
 
     # --- LOGIC & HELPERS ---
 
+    def mode_select_host_list(self, title: str):
+        self.all_hosts_cache = self.ssh_helper.get_all_hosts()
+        if not self.all_hosts_cache:
+            self.notify("No SSH configurations found!", severity="error")
+            return
+
+        self.query_one("#host-list-title", Label).update(title)
+        self.update_host_list(query="")
+        self.query_one("#ssh-menu-area").add_class("hidden")
+        self.query_one("#ssh-host-list-area").remove_class("hidden")
+        
+        search_input = self.query_one("#search-box", Input)
+        search_input.value = "" 
+        search_input.focus()
+
     def update_host_list(self, query: str = ""):
-        """Filters and rebuilds the ListView based on the query."""
         list_view = self.query_one("#host-list-view", ListView)
         list_view.clear()
-
-        # Filter from cached list
         filtered_hosts = [h for h in self.all_hosts_cache if query in h.lower()]
-
-        if not filtered_hosts:
-            # Optional: Show 'No results' placeholder if needed
-            pass
-
         for host in filtered_hosts:
             list_view.append(SSHHostItem(host))
+
+    # --- NEW: LAUNCHER LOGIC ---
+    # --- FIX: LAUNCHER LOGIC ---
+    
+    def launch_ssh_in_new_tab(self, host_alias: str):
+        """
+        Detects the OS/Terminal and launches SSH in a new tab/window.
+        Does NOT suspend the TUI.
+        """
+        self.notify(f"Launching SSH for {host_alias}...", severity="information")
+
+        system_os = platform.system()
+        # Ambil full path untuk ssh agar lebih aman
+        ssh_cmd = "ssh" 
+        
+        # Deteksi Terminal Emulator
+        term_program = os.environ.get("TERM_PROGRAM", "").lower()
+        
+        try:
+            # 1. WINDOWS TERMINAL (wt.exe)
+            if system_os == "Windows":
+                subprocess.Popen(f"wt -w 0 nt ssh {host_alias}", shell=True)
+                return
+
+            # 2. MACOS - iTerm2
+            if "iterm" in term_program:
+                script = f'''
+                tell application "iTerm"
+                    tell current window
+                        create tab with default profile
+                        tell current session of current tab
+                            write text "{ssh_cmd} {host_alias}"
+                        end tell
+                    end tell
+                end tell
+                '''
+                subprocess.run(["osascript", "-e", script])
+                return
+
+            # 3. MACOS/LINUX - Ghostty 
+            # FIX: Argumen dipisah koma dalam list, jangan digabung string f""
+            if "ghostty" in term_program:
+                subprocess.Popen(["ghostty", "-e", ssh_cmd, host_alias])
+                return
+
+            # 4. MACOS - Default Terminal.app
+            if system_os == "Darwin" and "apple_terminal" in term_program:
+                script = f'''
+                tell application "Terminal"
+                    do script "{ssh_cmd} {host_alias}"
+                    activate
+                end tell
+                '''
+                subprocess.run(["osascript", "-e", script])
+                return
+
+            # 5. LINUX - Gnome Terminal (Ubuntu Default)
+            if system_os == "Linux":
+                if os.path.exists("/usr/bin/gnome-terminal"):
+                    subprocess.Popen(["gnome-terminal", "--tab", "--", ssh_cmd, host_alias])
+                    return
+                # Fallback: x-terminal-emulator
+                subprocess.Popen(["x-terminal-emulator", "-e", f"{ssh_cmd} {host_alias}"])
+                return
+
+            # 6. Fallback Generic (Mencoba membuka window baru default system)
+            # Jika terminal tidak terdeteksi, kita coba jalankan command langsung
+            self.notify("Terminal type not detected explicitly. Trying generic launch.", severity="warning")
+            if system_os == "Darwin":
+                 subprocess.Popen(["open", "-a", "Terminal", f"ssh {host_alias}"]) # Fallback Mac
+            else:
+                 subprocess.Popen(["x-terminal-emulator", "-e", f"ssh {host_alias}"])
+
+        except Exception as e:
+            self.notify(f"Failed to launch terminal: {e}", severity="error")
+    
 
     def mode_add_new(self):
         self.editing_host = None
@@ -281,27 +332,6 @@ class SSHManagerScreen(Screen):
         self.query_one("#ssh-menu-area").add_class("hidden")
         self.query_one("#ssh-form-area").remove_class("hidden")
         self.query_one("#input-host").focus()
-
-    def mode_select_host_to_edit(self):
-        """Prepare the list with all hosts and focus the search box."""
-        # 1. Fetch ALL hosts and cache them
-        self.all_hosts_cache = self.ssh_helper.get_all_hosts()
-        
-        if not self.all_hosts_cache:
-            self.notify("No SSH configurations found!", severity="error")
-            return
-
-        # 2. Populate list (initially empty query shows all)
-        self.update_host_list(query="")
-
-        # 3. Switch View
-        self.query_one("#ssh-menu-area").add_class("hidden")
-        self.query_one("#ssh-host-list-area").remove_class("hidden")
-        
-        # 4. Clear search box and FOCUS it immediately
-        search_input = self.query_one("#search-box", Input)
-        search_input.value = "" 
-        search_input.focus()
 
     def mode_edit_form(self, host_name: str):
         self.editing_host = host_name
@@ -328,7 +358,6 @@ class SSHManagerScreen(Screen):
             return
 
         new_data = {"Host": host, "HostName": hostname, "User": user, "Port": port}
-
         success = self.ssh_helper.save_host_config(self.editing_host, new_data)
         
         if success:
