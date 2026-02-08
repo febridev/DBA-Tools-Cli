@@ -1,52 +1,40 @@
-# DBA Tools CLI
+# DBA Tools CLI (TUI Edition)
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/python-v3.12-blue.svg)](https://www.python.org/downloads/release/python-312/)
-[![PDM](https://img.shields.io/badge/pdm-package%20manager-blueviolet.svg)](https://pdm-project.org/latest/)
-[![Database](https://img.shields.io/badge/database-sqlite-green.svg)](https://www.sqlite.org/)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Textual](https://img.shields.io/badge/framework-Textual-green.svg)](https://textual.textualize.io/)
 
 ## Description
 
-DBA Tools CLI is a command-line application built with Python v3.12. It serves as a set of tools for Database Administrators (DBAs) and developers working with SQLite databases. The application streamlines common database administration tasks and provides a convenient command-line interface for managing databases efficiently.
+**DBA Tools CLI** has evolved into a powerful Textual User Interface (TUI) application designed for Database Administrators and DevOps engineers. Built with Python and the [Textual](https://textual.textualize.io/) framework, it provides a retro-modern interface to manage your daily workflows directly from the terminal.
 
-## Features
+This tool now utilizes **[uv](https://github.com/astral-sh/uv)** for extremely fast package management and dependency resolution.
 
-- [ ] Interactive for search environment database server list
+## ✨ Features
 
-## Installation
+### 🖥️ SSH Manager (New!)
+Manage your SSH connections without leaving the keyboard.
+- **Visual Config Management**: Add, Edit, and View hosts stored in your local `~/.ssh/config`.
+- **Searchable List**: Quickly filter through hundreds of servers.
+- **Smart Launcher**: Connect to servers in a **New Tab** or **New Window** automatically.
+    - *Supported Terminals:* Ghostty, iTerm2, Windows Terminal, GNOME Terminal, Apple Terminal.
 
-To install DBA Tools CLI, ensure you have Python v3.12 and PDM installed on your system. Then, follow these steps:
+### 📝 To-Do List
+A simple, persistent task manager integrated into your workspace.
+- **Auto-save**: Tasks are saved to JSON automatically.
+- **Quick Actions**: Add, Delete, and Toggle status with keyboard shortcuts.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/febridev/DBA-Tools-Cli.git
-   cd DBA-Tools-Cli
-   ```
-2. Install All Dependency:
+### 🗄️ Database IDE (WIP)
+- *Coming Soon*: Integrated lightweight SQL client for SQLite and other databases.
 
+## 🚀 Installation
+
+Ensure you have **Python 3.9+** installed. This project uses **uv** for dependency management.
+
+### 1. Install uv
+If you haven't installed `uv` yet, run the official installer:
+
+**macOS / Linux:**
 ```bash
-   pdm install
-```
-
-3. Set .env file for database `serverlist`
-
-```bash
-cp env.example .env
-```
-
-4. Edit .env put detail database SQLite
-
-5. Usage
-
-```bash
-pdm run python -m cli_python.main_menu
-
-```
-
-# License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-# Acknowledgments
-
-Remember to replace placeholders such as `your-username` with your actual GitHub username and update sections like features, commands, and acknowledgments based on your application's specifics.
+curl -LsSf [https://astral.sh/uv/install.sh](https://astral.sh/uv/install.sh) | sh
