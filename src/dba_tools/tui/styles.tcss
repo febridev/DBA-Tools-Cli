@@ -164,3 +164,61 @@ ListItem.task-done:hover Label, ListItem.task-done.-highlight Label {
     background: #db4b4b; /* Merah sedikit lebih gelap/beda tone */
     color: #1a1b26;
 }
+
+/* --- AI TRANSLATOR STYLES --- */
+#translator-form {
+    margin-top: 1;
+    padding: 1;
+}
+
+/* Container untuk membuat Label dan Tombol Copy sebaris */
+.label-row {
+    height: 1;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+/* Memaksa label mengambil sisa ruang sebelah kiri */
+.label-row .menu-label {
+    width: 1fr;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* Gaya khusus untuk tombol Copy kecil di kanan */
+.btn-copy {
+    width: auto;
+    min-width: 8;
+    height: 1;
+    border: none;
+    background: #24283b; /* Tokyo Storm */
+    color: #7dcfff;      /* Tokyo Cyan */
+    text-style: bold;
+}
+
+.btn-copy:hover {
+    background: #7dcfff;
+    color: #1a1b26;
+}
+
+#btn-translate {
+    background: #bb9af7; /* Tokyo Magenta */
+    color: #1a1b26;      
+    border: none;
+    text-style: bold;
+    width: 100%;
+    margin-bottom: 1;
+    margin-top: 1;
+}
+
+#btn-translate:hover, #btn-translate:focus {
+    background: #9d7cd8;
+    color: #1a1b26;
+}
+
+#input-id, #output-en {
+    height: 8;
+    border: solid #7aa2f7;
+    background: #24283b;
+    color: #c0caf5;
+}
