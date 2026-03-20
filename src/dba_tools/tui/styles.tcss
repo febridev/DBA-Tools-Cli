@@ -18,7 +18,7 @@ Screen {
 }
 
 #main-container {
-    width: 60;
+    width: 100;
     height: auto;
     border: none;
     padding: 1 2;
@@ -162,5 +162,116 @@ ListItem.task-done:hover Label, ListItem.task-done.-highlight Label {
 /* Efek saat Cancel disorot/hover */
 #btn-cancel-ssh:hover, #btn-cancel-ssh:focus {
     background: #db4b4b; /* Merah sedikit lebih gelap/beda tone */
+    color: #1a1b26;
+}
+
+/* --- AI TRANSLATOR STYLES --- */
+#translator-form {
+    margin-top: 1;
+    padding: 1;
+}
+
+/* Container untuk membuat Label dan Tombol Copy sebaris */
+.label-row {
+    height: 1;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+/* Memaksa label mengambil sisa ruang sebelah kiri */
+.label-row .menu-label {
+    width: 1fr;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* Gaya khusus untuk tombol Copy kecil di kanan */
+.btn-copy {
+    width: auto;
+    min-width: 8;
+    height: 1;
+    border: none;
+    background: #24283b; /* Tokyo Storm */
+    color: #7dcfff;      /* Tokyo Cyan */
+    text-style: bold;
+}
+
+.btn-copy:hover {
+    background: #7dcfff;
+    color: #1a1b26;
+}
+
+#btn-translate {
+    background: #bb9af7; /* Tokyo Magenta */
+    color: #1a1b26;      
+    border: none;
+    text-style: bold;
+    width: 100%;
+    margin-bottom: 1;
+    margin-top: 1;
+}
+
+#btn-translate:hover, #btn-translate:focus {
+    background: #9d7cd8;
+    color: #1a1b26;
+}
+
+.btn-swap {
+    width: auto;
+    min-width: 10;
+    height: 1;
+    background: #e0af68; /* Tokyo Yellow */
+    color: #1a1b26;
+    border: none;
+    text-style: bold;
+    margin-right: 1;
+}
+
+.btn-swap:hover, .btn-swap:focus {
+    background: #ff9e64; /* Orange */
+    color: #1a1b26;
+}
+
+#input-id, #output-en, #awr-paths, #awr-results {
+    height: 20;
+    border: solid #7aa2f7;
+    background: #24283b;
+    color: #c0caf5;
+}
+
+#awr-form {
+    margin-top: 1;
+    padding: 1;
+}
+
+#btn-analyze {
+    background: #9ece6a; /* Tokyo Green */
+    color: #1a1b26;
+    border: none;
+    text-style: bold;
+    width: 100%;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+#btn-analyze:hover, #btn-analyze:focus {
+    background: #73daca;
+    color: #1a1b26;
+}
+
+/* Copy/Select buttons for results - use same style as other copy buttons */
+#awr-form .btn-copy {
+    width: auto;
+    min-width: 8;
+    height: 1;
+    border: none;
+    background: #24283b; /* Tokyo Storm */
+    color: #7dcfff;      /* Tokyo Cyan */
+    text-style: bold;
+    margin-left: 1;
+}
+
+#awr-form .btn-copy:hover {
+    background: #7dcfff;
     color: #1a1b26;
 }
