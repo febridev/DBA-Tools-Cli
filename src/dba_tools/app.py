@@ -10,6 +10,7 @@ from src.dba_tools.tui.screens.ssh_manager import SSHManagerScreen
 # -- IMPORT NEW SCREEN --
 from src.dba_tools.tui.screens.todo_list import ToDoListScreen
 from src.dba_tools.tui.screens.translator import TranslatorScreen
+from src.dba_tools.tui.screens.awr_analyzer import AWRAnalyzerScreen
 
 # Konstanta Versi
 APP_VERSION = "0.2.0"
@@ -33,7 +34,6 @@ class DBAToolsApp(App):
 
     def compose(self) -> ComposeResult:
         with Container(id="main-container"):
-
             # 1. HEADER
             with Container(id="header-area"):
                 yield Static(ASCII_TITLE, classes="ascii-title")
@@ -47,7 +47,8 @@ class DBAToolsApp(App):
                 ListItem(Label("2. \uebca SSH"), id="opt-ssh"),
                 ListItem(Label("3. \ue706 DATABASE IDE"), id="opt-dbide"),
                 ListItem(Label("4. \uf556 AI TRANSLATOR"), id="opt-translator"),
-                ListItem(Label("5. \uf011 SYSTEM_EXIT"), id="opt-exit"),
+                ListItem(Label("5. \uf0a0 ORACLE AWR ANALYSIS"), id="opt-awr"),
+                ListItem(Label("6. \uf011 SYSTEM_EXIT"), id="opt-exit"),
                 initial_index=0,
             )
 
@@ -69,6 +70,8 @@ class DBAToolsApp(App):
             self.notify("ACCESSING Database IDE...", severity="information")
         elif selected_id == "opt-translator":
             self.push_screen(TranslatorScreen())
+        elif selected_id == "opt-awr":
+            self.push_screen(AWRAnalyzerScreen())
         elif selected_id == "opt-exit":
             self.exit()
 
