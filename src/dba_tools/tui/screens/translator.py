@@ -1,7 +1,10 @@
+import json
 import os
 
+import requests
 from dotenv import load_dotenv
-from google import genai
+
+# from google import genai
 from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -26,16 +29,28 @@ class TranslatorScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         load_dotenv(override=True)
-        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
 
-        if api_key:
-            self.client = genai.Client(api_key=api_key)
-        else:
-            self.client = None
-            self.notify("API Key KOSONG! Cek file .env", severity="error")
+        # Ambil konfigurasi dari .env
+        self.api_key = os.environ.get("GEMINI_API_KEY", "dummy_key").strip()
+
+        # Ambil URL 9router, jika tidak ada di .env gunakan default localhost:8000
+        self.router_url = os.environ.get("ROUTER_URL", "http://127.0.0.1:8000").strip()
 
         self.direction = "id_to_en"  # "id_to_en" or "en_to_id"
 
+    # def __init__(self, **kwargs):
+    #     super().__init__(**kwargs)
+    #     load_dotenv(override=True)
+    #     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    #
+    #     if api_key:
+    #         self.client = genai.Client(api_key=api_key)
+    #     else:
+    #         self.client = None
+    #         self.notify("API Key KOSONG! Cek file .env", severity="error")
+    #
+    #     self.direction = "id_to_en"  # "id_to_en" or "en_to_id"
+    #
     def compose(self) -> ComposeResult:
         with Container(id="main-container"):
             yield Static("[ MODULE: AI_TRANSLATOR ]", classes="header-area ascii-title")
@@ -176,14 +191,8 @@ class TranslatorScreen(Screen):
             )
             return
 
-        if not self.client:
-            self.app.call_from_thread(
-                output_widget.load_text, "ERROR: GEMINI_API_KEY tidak ditemukan."
-            )
-            return
-
         self.app.call_from_thread(
-            output_widget.load_text, "Mengirim ke AI... Mohon tunggu sebentar."
+            output_widget.load_text, "Mengirim ke 9Router... Mohon tunggu sebentar."
         )
 
         if self.direction == "id_to_en":
@@ -201,23 +210,58 @@ class TranslatorScreen(Screen):
                 f"Text: '{text_to_translate}'"
             )
 
+        # --- BAGIAN YANG DIUBAH MULAI DARI SINI ---
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        # Format payload standar yang biasanya diterima oleh AI Router
+        payload = {
+            "model": "gc/gemini-3-flash-preview",  # Pastikan 9Router mengenali nama model ini
+            "stream": False,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+
         try:
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash", contents=prompt
-            )
+            # Mengirim POST request ke 9Router
+            response = requests.post(self.router_url, headers=headers, json=payload)
+
+            # 1. Cek apakah HTTP statusnya bermasalah (bukan 200 OK)
+            if response.status_code != 200:
+                error_msg = f"HTTP Error: {response.status_code}\nBalasan mentah:\n{response.text}"
+                self.app.call_from_thread(output_widget.load_text, error_msg)
+                self.app.call_from_thread(
+                    self.notify, "Gagal terhubung ke Router.", severity="error"
+                )
+                return
+
+            # 2. Cek apakah balasannya benar-benar JSON yang valid
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                error_msg = f"Error: Balasan dari 9Router bukan JSON!\nIsi balasan mentah:\n{response.text}"
+                self.app.call_from_thread(output_widget.load_text, error_msg)
+                return
+
+            # 3. Mengambil teks hasil terjemahan dari format balasan OpenAI
+            choices = data.get("choices", [])
+            if not choices:
+                error_msg = f"Format balasan tidak dikenali. Balasan utuh:\n{data}"
+                self.app.call_from_thread(output_widget.load_text, error_msg)
+                return
+
             result_text = (
-                response.text.strip()
-                if response.text
-                else "No translation returned from AI."
+                choices[0].get("message", {}).get("content", "Terjemahan kosong.")
             )
 
-            self.app.call_from_thread(output_widget.load_text, result_text)
+            self.app.call_from_thread(output_widget.load_text, result_text.strip())
             self.app.call_from_thread(
                 self.notify, "Berhasil diterjemahkan!", severity="information"
             )
 
         except Exception as e:
-            error_msg = f"Error: {str(e)}\n\nPastikan API Key Anda valid."
+            error_msg = f"Error Koneksi: {str(e)}\n\nPastikan 9Router berjalan dan URL di .env benar."
             self.app.call_from_thread(output_widget.load_text, error_msg)
             self.app.call_from_thread(
                 self.notify, "Gagal memproses terjemahan.", severity="error"

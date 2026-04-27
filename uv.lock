@@ -309,6 +309,7 @@ dependencies = [
     { name = "google-genai", version = "1.47.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "google-genai", version = "1.65.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "python-dotenv" },
+    { name = "requests" },
     { name = "textual" },
 ]
 
@@ -316,6 +317,7 @@ dependencies = [
 requires-dist = [
     { name = "google-genai", specifier = ">=1.47.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "requests" },
     { name = "textual", specifier = ">=7.3.0" },
 ]
 
