@@ -1,7 +1,8 @@
+import json
 import os
 
+import requests
 from dotenv import load_dotenv
-from google import genai
 from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -11,7 +12,7 @@ from textual.widgets import Button, Label, Static, TextArea
 
 
 class AWRAnalyzerScreen(Screen):
-    """Screen untuk analisis AWR Oracle menggunakan AI."""
+    """Screen for AWR Oracle analysis using AI."""
 
     CSS_PATH = "../styles.tcss"
 
@@ -23,13 +24,17 @@ class AWRAnalyzerScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         load_dotenv(override=True)
-        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
 
-        if api_key:
-            self.client = genai.Client(api_key=api_key)
-        else:
-            self.client = None
-            self.notify("API Key KOSONG! Cek file .env", severity="error")
+        # Load configuration from .env
+        self.api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+
+        # Load 9router URL, use default localhost:8000 if not set in .env
+        self.router_url = os.environ.get("ROUTER_URL", "http://127.0.0.1:8000").strip()
+        # Ensure we use the full path if provided in .env
+        if "\n" in self.router_url:
+            urls = [u.strip() for u in self.router_url.split("\n") if u.strip()]
+            # Prefer the one with /v1/ or the last one (usually more specific)
+            self.router_url = next((u for u in reversed(urls) if "/v1/" in u), urls[-1])
 
     def compose(self) -> ComposeResult:
         with Container(id="main-container"):
@@ -72,7 +77,7 @@ class AWRAnalyzerScreen(Screen):
             self.copy_all_text("#awr-results")
 
     def action_analyze(self) -> None:
-        """Handler untuk hotkey Ctrl+Enter."""
+        """Handler for Ctrl+Enter hotkey."""
         self.analyze_awr()
 
     def select_all_text(self, widget_id: str) -> None:
@@ -98,13 +103,13 @@ class AWRAnalyzerScreen(Screen):
 
         if not paths_input:
             self.app.call_from_thread(
-                self.notify, "Tidak ada file path yang dimasukkan!", severity="error"
+                self.notify, "No file path provided!", severity="error"
             )
             return
 
-        if not self.client:
+        if not self.api_key:
             self.app.call_from_thread(
-                results_widget.load_text, "ERROR: GEMINI_API_KEY tidak ditemukan."
+                results_widget.load_text, "ERROR: GEMINI_API_KEY not found."
             )
             return
 
@@ -121,14 +126,14 @@ class AWRAnalyzerScreen(Screen):
         if missing_files:
             self.app.call_from_thread(
                 self.notify,
-                f"File tidak ditemukan: {', '.join(missing_files)}",
+                f"Files not found: {', '.join(missing_files)}",
                 severity="warning",
             )
 
         if not valid_paths:
             self.app.call_from_thread(
                 results_widget.load_text,
-                "ERROR: Tidak ada file AWR yang valid ditemukan.\n\nPastikan path file sudah benar.",
+                "ERROR: No valid AWR files found.\n\nPlease check the file paths.",
             )
             return
 
@@ -142,12 +147,9 @@ class AWRAnalyzerScreen(Screen):
             try:
                 with open(path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
-                    # Limit content to first 50K characters per file to avoid token limits
-                    if len(content) > 50000:
-                        content = (
-                            content[:50000]
-                            + "\n... [content truncated for token limit]"
-                        )
+                    # Limit content to first 30K characters to avoid proxy/token limits
+                    if len(content) > 30000:
+                        content = content[:30000] + "\n... [content truncated]"
                     awr_contents.append(
                         f"=== FILE: {os.path.basename(path)} ===\n{content}\n"
                     )
@@ -158,52 +160,91 @@ class AWRAnalyzerScreen(Screen):
 
         combined_content = "\n".join(awr_contents)
 
-        prompt = (
-            "You are an Oracle Database Performance Expert. Analyze the following AWR (Automatic Workload Repository) "
-            "reports and provide a clear, easy-to-understand summary for non-technical people. "
-            "Structure your analysis with these sections:\n\n"
-            "1. DATABASE SERVER CONDITION:\n"
-            "   - Overall health status\n"
-            "   - Key performance indicators\n\n"
-            "2. RECOMMENDATIONS (Priority Order):\n"
-            "   - Immediate actions needed\n"
-            "   - Medium-term improvements\n\n"
-            "3. IO INFORMATION:\n"
-            "   - Disk performance issues\n"
-            "   - Read/Write metrics\n\n"
-            "4. CPU INFORMATION:\n"
-            "   - CPU usage patterns\n"
-            "   - Top wait events\n\n"
-            "5. MEMORY INFORMATION:\n"
-            "   - SGA/PGA usage\n"
-            "   - Memory bottlenecks\n\n"
-            "6. Slow Query\n"
-            "Use simple language. Avoid technical jargon where possible. If certain data is missing from the AWR, "
-            "mention it and suggest what additional information would be helpful.\n\n"
-            f"AWR Reports Content:\n{combined_content}"
-        )
+        # Load prompt template from markdown file
+        prompt_template_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "prompts", "awr_analysis_prompt.md")
+        try:
+            with open(prompt_template_path, "r", encoding="utf-8") as f:
+                prompt_template = f.read()
+            prompt = prompt_template.format(content=combined_content)
+        except Exception as e:
+            self.app.call_from_thread(self.notify, f"Error loading prompt template: {str(e)}", severity="error")
+            # Fallback to simple prompt if file reading fails
+            prompt = f"Analyze these AWR reports:\n{combined_content}"
 
         try:
             self.app.call_from_thread(
                 results_widget.load_text,
-                "Analyzing AWR reports with AI... This may take a moment.",
+                "Sending to 9Router... This may take a moment.",
             )
 
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash", contents=prompt
-            )
-            result_text = (
-                response.text.strip()
-                if response.text
-                else "No analysis returned from AI."
-            )
+            # Match models from translator.py which are known to work
+            available_models = [
+                "gc/gemini-3-flash-preview",
+                "anthropic/claude-3-opus",
+                "openai/gpt-4-turbo",
+            ]
+
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            }
+
+            result_text = None
+            selected_model = None
+            last_status = None
+            last_error_msg = ""
+
+            for model in available_models:
+                payload = {
+                    "model": model,
+                    "stream": False,
+                    "messages": [{"role": "user", "content": prompt}],
+                }
+
+                try:
+                    response = requests.post(
+                        self.router_url, headers=headers, json=payload, timeout=90
+                    )
+                    last_status = response.status_code
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get("choices"):
+                            result_text = (
+                                data["choices"][0]
+                                .get("message", {})
+                                .get("content", "")
+                                .strip()
+                            )
+                            if result_text:
+                                selected_model = model
+                                break
+                    else:
+                        last_error_msg = (
+                            f"HTTP {response.status_code}: {response.text[:100]}"
+                        )
+                except Exception as e:
+                    last_error_msg = str(e)
+                    continue
+
+            if not result_text:
+                error_info = f"\n\nDetails: {last_error_msg if last_error_msg else 'No response from proxy'}"
+                self.app.call_from_thread(
+                    results_widget.load_text,
+                    f"Error: All models failed or returned empty result.{error_info}",
+                )
+                self.app.call_from_thread(
+                    self.notify, "Analysis failed.", severity="error"
+                )
+                return
 
             self.app.call_from_thread(results_widget.load_text, result_text)
             self.app.call_from_thread(
-                self.notify, "AWR analysis completed!", severity="information"
+                self.notify,
+                f"AWR analysis completed using {selected_model}!",
+                severity="information",
             )
 
         except Exception as e:
-            error_msg = f"Error during analysis: {str(e)}\n\nPlease check your API key and try again."
+            error_msg = f"Critical Error: {str(e)}\n\nPlease check your configuration."
             self.app.call_from_thread(results_widget.load_text, error_msg)
             self.app.call_from_thread(self.notify, "Analysis failed.", severity="error")

@@ -78,6 +78,10 @@ class TranslatorScreen(Screen):
                 classes="footer-text",
             )
 
+    def on_mount(self) -> None:
+        """Focus the input text area when the screen is mounted."""
+        self.query_one("#input-id").focus()
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         btn_id = event.button.id
 
@@ -118,6 +122,13 @@ class TranslatorScreen(Screen):
     def action_translate(self) -> None:
         """Handler for F5 hotkey from keyboard."""
         self.process_translation()
+
+    def select_all_text(self, widget_id: str) -> None:
+        """Select all text in the given TextArea widget."""
+        text_area = self.query_one(widget_id, TextArea)
+        if text_area:
+            text_area.focus()
+            text_area.select_all()
 
     def action_select_all(self) -> None:
         """Handler for Ctrl+A - select all in input."""
