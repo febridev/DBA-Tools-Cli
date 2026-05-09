@@ -239,6 +239,21 @@ ListItem.task-done:hover Label, ListItem.task-done.-highlight Label {
     color: #c0caf5;
 }
 
+#loading-indicator {
+    height: 1;
+    display: none;
+    color: #7aa2f7;
+}
+
+#status-text {
+    width: 100%;
+    text-align: center;
+    color: #e0af68;
+    display: none;
+    margin-bottom: 1;
+    text-style: bold;
+}
+
 #awr-form {
     margin-top: 1;
     padding: 1;

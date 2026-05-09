@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 import requests
 from dotenv import load_dotenv
@@ -12,7 +13,8 @@ from textual.binding import Binding
 # Add Horizontal here
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Button, Label, Static, TextArea
+from textual.widgets import Button, Label, LoadingIndicator, Static, TextArea
+
 
 class TranslatorScreen(Screen):
     """Interactive screen for Translator AI (ID <-> EN)."""
@@ -54,6 +56,10 @@ class TranslatorScreen(Screen):
 
                 # Input TextArea
                 yield TextArea(id="input-id", soft_wrap=True)
+
+                # Loading Indicators (Hidden by default)
+                yield LoadingIndicator(id="loading-indicator")
+                yield Label("", id="status-text")
 
                 # Button row: Swap & Translate
                 with Horizontal(classes="label-row"):
@@ -115,7 +121,9 @@ class TranslatorScreen(Screen):
             text = self.query_one("#output-en", TextArea).text.strip()
             if text:
                 self.app.copy_to_clipboard(text)
-                self.notify("Translation result copied to clipboard!", severity="information")
+                self.notify(
+                    "Translation result copied to clipboard!", severity="information"
+                )
             else:
                 self.notify("Output is empty, nothing to copy.", severity="warning")
 
@@ -169,6 +177,8 @@ class TranslatorScreen(Screen):
     def process_translation(self) -> None:
         input_widget = self.query_one("#input-id", TextArea)
         output_widget = self.query_one("#output-en", TextArea)
+        loading_indicator = self.query_one("#loading-indicator", LoadingIndicator)
+        status_text = self.query_one("#status-text", Label)
 
         text_to_translate = input_widget.text.strip()
 
@@ -179,8 +189,15 @@ class TranslatorScreen(Screen):
             return
 
         self.app.call_from_thread(
-            output_widget.load_text, "Sending to 9Router... Please wait a moment."
+            output_widget.load_text, "Translating... Please wait."
         )
+        
+        # Show and reset loading indicator/status
+        def setup_ui():
+            loading_indicator.styles.display = "block"
+            status_text.styles.display = "block"
+            status_text.update("Starting translation...")
+        self.app.call_from_thread(setup_ui)
 
         if self.direction == "id_to_en":
             prompt = (
@@ -214,8 +231,18 @@ class TranslatorScreen(Screen):
 
             result_text = None
             selected_model = None
+            max_attempts = 10
+            retry_delay = 2
 
-            for model in available_models:
+            for attempt in range(max_attempts):
+                # Update status text
+                self.app.call_from_thread(
+                    status_text.update, f"Translating... (Attempt {attempt + 1}/{max_attempts})"
+                )
+                
+                # Cycle through models
+                model = available_models[attempt % len(available_models)]
+                
                 payload = {
                     "model": model,
                     "stream": False,
@@ -223,50 +250,53 @@ class TranslatorScreen(Screen):
                 }
 
                 try:
-                    response = requests.post(self.router_url, headers=headers, json=payload, timeout=30)
+                    response = requests.post(
+                        self.router_url, headers=headers, json=payload, timeout=30
+                    )
                     if response.status_code == 200:
-                        try:
-                            data = response.json()
-                            if data.get("choices"):
+                        data = response.json()
+                        if data.get("choices"):
+                            content = data["choices"][0].get("message", {}).get("content", "").strip()
+                            if content:
+                                result_text = content
                                 selected_model = model
-                                result_text = data["choices"][0].get("message", {}).get("content", "").strip()
                                 break
-                        except json.JSONDecodeError:
-                            continue
-                except Exception:
-                    continue
-
-            # Fallback if no model succeeded
-            if result_text is None:
-                # Try the last model in the list as fallback
-                payload = {
-                    "model": available_models[-1],
-                    "stream": False,
-                    "messages": [{"role": "user", "content": prompt}],
-                }
-                try:
-                    response = requests.post(self.router_url, headers=headers, json=payload, timeout=30)
-                    if response.status_code == 200:
-                        try:
-                            data = response.json()
-                            if data.get("choices"):
-                                result_text = data["choices"][0].get("message", {}).get("content", "").strip()
-                        except json.JSONDecodeError:
-                            pass
                 except Exception:
                     pass
 
-            self.app.call_from_thread(output_widget.load_text, result_text if result_text else "Empty translation.")
-            if selected_model:
+                if attempt < max_attempts - 1:
+                    time.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, 10) # Exponential backoff capped at 10s
+
+            # Hide indicators when done
+            def cleanup_ui():
+                loading_indicator.styles.display = "none"
+                status_text.styles.display = "none"
+            self.app.call_from_thread(cleanup_ui)
+
+            self.app.call_from_thread(
+                output_widget.load_text,
+                result_text if result_text else "Empty translation after multiple attempts.",
+            )
+            
+            if result_text:
                 self.app.call_from_thread(
-                    self.notify, f"Successfully translated using {selected_model}!", severity="information"
+                    self.notify,
+                    f"Successfully translated using {selected_model}!",
+                    severity="information",
                 )
             else:
                 self.app.call_from_thread(
-                    self.notify, "Successfully translated (fallback).", severity="information"
+                    self.notify,
+                    "Failed to get a translation after 10 attempts.",
+                    severity="error",
                 )
 
         except Exception as e:
+            def error_cleanup_ui():
+                loading_indicator.styles.display = "none"
+                status_text.styles.display = "none"
+            self.app.call_from_thread(error_cleanup_ui)
             error_msg = f"Connection Error: {str(e)}\n\nPlease ensure 9Router is running and the URL in .env is correct."
             self.app.call_from_thread(output_widget.load_text, error_msg)
             self.app.call_from_thread(
