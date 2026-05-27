@@ -19,14 +19,15 @@ class AWRAnalyzerScreen(Screen):
     BINDINGS = [
         Binding("escape", "app.pop_screen", "Back"),
         Binding("ctrl+enter", "analyze", "Analyze"),
+        Binding("f5", "analyze", "Analyze"),
     ]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         load_dotenv(override=True)
 
-        # Load configuration from .env
-        self.api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        # Load configuration from .env (fallback to dummy key for routers that don't need auth)
+        self.api_key = os.environ.get("ROUTER_API_KEY", os.environ.get("GEMINI_API_KEY", "dummy-router-key")).strip()
 
         # Load 9router URL, use default localhost:8000 if not set in .env
         self.router_url = os.environ.get("ROUTER_URL", "http://127.0.0.1:8000").strip()
@@ -44,12 +45,12 @@ class AWRAnalyzerScreen(Screen):
 
             with Vertical(id="awr-form"):
                 yield Label(
-                    "Input AWR File Paths (one per line):", classes="menu-label"
+                    "Input AWR File/Directory Paths (one per line):", classes="menu-label"
                 )
 
                 yield TextArea(
                     id="awr-paths",
-                    placeholder="Enter full paths to AWR report files (HTML or text format)...",
+                    placeholder="Enter full paths to AWR files or directories (html/txt)...",
                     soft_wrap=True,
                 )
 
@@ -64,7 +65,7 @@ class AWRAnalyzerScreen(Screen):
 
                 yield TextArea(id="awr-results", read_only=True, soft_wrap=True)
 
-            yield Label("\[ESC] BACK | \[CTRL+ENTER] ANALYZE", classes="footer-text")
+            yield Label("\[ESC] BACK | \[F5] or \[CTRL+ENTER] ANALYZE", classes="footer-text")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         btn_id = event.button.id
@@ -107,26 +108,32 @@ class AWRAnalyzerScreen(Screen):
             )
             return
 
-        if not self.api_key:
-            self.app.call_from_thread(
-                results_widget.load_text, "ERROR: GEMINI_API_KEY not found."
-            )
-            return
+
+        import pathlib
 
         file_paths = [p.strip() for p in paths_input.splitlines() if p.strip()]
         valid_paths = []
-        missing_files = []
+        missing_inputs = []
 
-        for path in file_paths:
-            if os.path.exists(path):
-                valid_paths.append(path)
-            else:
-                missing_files.append(path)
+        for path_str in file_paths:
+            p = pathlib.Path(path_str)
+            if not p.exists():
+                missing_inputs.append(path_str)
+            elif p.is_file():
+                valid_paths.append(str(p))
+            elif p.is_dir():
+                for ext in ('*.html', '*.txt'):
+                    for f in p.rglob(ext):
+                        if f.is_file():
+                            valid_paths.append(str(f))
 
-        if missing_files:
+        # Sort valid paths chronologically (based on filename)
+        valid_paths = sorted(list(set(valid_paths)))
+
+        if missing_inputs:
             self.app.call_from_thread(
                 self.notify,
-                f"Files not found: {', '.join(missing_files)}",
+                f"Paths not found: {', '.join(missing_inputs)}",
                 severity="warning",
             )
 
@@ -160,16 +167,28 @@ class AWRAnalyzerScreen(Screen):
 
         combined_content = "\n".join(awr_contents)
 
-        # Load prompt template from markdown file
-        prompt_template_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "prompts", "awr_analysis_prompt.md")
-        try:
-            with open(prompt_template_path, "r", encoding="utf-8") as f:
-                prompt_template = f.read()
-            prompt = prompt_template.format(content=combined_content)
-        except Exception as e:
-            self.app.call_from_thread(self.notify, f"Error loading prompt template: {str(e)}", severity="error")
-            # Fallback to simple prompt if file reading fails
-            prompt = f"Analyze these AWR reports:\n{combined_content}"
+        # Use a detailed internal prompt to guarantee HTML output focusing on CPU, Memory, IO, and Queries
+        prompt = f"""You are an Expert Oracle Database Administrator.
+I have provided {len(valid_paths)} Oracle AWR reports spanning different times. 
+Please compare them and provide a comprehensive summary of the database performance trends and anomalies.
+
+Specifically, I need you to focus on and detail the following aspects:
+1. CPU Usage and Bottlenecks
+2. Memory Allocation and Issues
+3. I/O Performance and Wait Events
+4. Top Queries (SQL ordered by Elapsed Time/CPU/Gets) and recommendations
+
+CRITICAL INSTRUCTIONS:
+- You MUST format your entire response as a valid, stylized HTML document.
+- Do NOT use markdown code blocks (```html ... ```), output ONLY the raw HTML.
+- Use a modern, clean CSS style (embedded in <style> tags).
+- Include tables to compare metrics across the different time periods.
+- **Time Context**: Whenever presenting data or metrics, clearly state the specific Date and Time (Snapshot Time) for each AWR report so we know exactly when the data is from.
+- **Definitive Conclusion**: At the very end of your report, provide a highly visible 'Final Conclusion & DBA Action Plan' section. This section MUST explicitly conclude whether the Database is healthy ('DB is OK') or if it requires immediate action ('Needs DBA Action'), followed by a prioritized bulleted list of the exact actions the DBA should take.
+
+AWR Data:
+{combined_content}
+"""
 
         try:
             self.app.call_from_thread(
@@ -237,12 +256,38 @@ class AWRAnalyzerScreen(Screen):
                 )
                 return
 
-            self.app.call_from_thread(results_widget.load_text, result_text)
-            self.app.call_from_thread(
-                self.notify,
-                f"AWR analysis completed using {selected_model}!",
-                severity="information",
-            )
+            # Clean up potential markdown wrappers
+            if result_text.startswith("```html"):
+                result_text = result_text[7:]
+            elif result_text.startswith("```"):
+                result_text = result_text[3:]
+            
+            if result_text.endswith("```"):
+                result_text = result_text[:-3]
+                
+            result_text = result_text.strip()
+
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_filename = f"awr_summary_{timestamp}.html"
+            report_path = os.path.abspath(report_filename)
+            
+            try:
+                with open(report_path, "w", encoding="utf-8") as f:
+                    f.write(result_text)
+                
+                success_msg = f"Analysis completed successfully!\n\nHTML Report saved to:\n{report_path}\n\nYou can open this file in your web browser."
+                self.app.call_from_thread(results_widget.load_text, success_msg)
+                self.app.call_from_thread(
+                    self.notify,
+                    f"Analysis completed! Saved to {report_filename}",
+                    severity="information",
+                )
+            except Exception as io_err:
+                self.app.call_from_thread(
+                    results_widget.load_text, 
+                    f"Analysis completed but failed to save file: {str(io_err)}\n\nRaw Output:\n{result_text}"
+                )
 
         except Exception as e:
             error_msg = f"Critical Error: {str(e)}\n\nPlease check your configuration."
