@@ -24,6 +24,7 @@ class TranslatorScreen(Screen):
     BINDINGS = [
         Binding("escape", "app.pop_screen", "Back"),
         Binding("ctrl+enter", "translate", "Translate"),
+        Binding("f5", "translate", "Translate (F5)"),
         Binding("ctrl+a", "select_all", "Select All"),
     ]
 
@@ -80,7 +81,7 @@ class TranslatorScreen(Screen):
                 yield TextArea(id="output-en", read_only=True, soft_wrap=True)
 
             yield Label(
-                "[ESC] BACK | [CTRL+ENTER] TRANSLATE | [CTRL+A] SELECT ALL",
+                "[ESC] BACK | [CTRL+ENTER] or [F5] TRANSLATE | [CTRL+A] SELECT ALL",
                 classes="footer-text",
             )
 
